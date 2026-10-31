@@ -6,12 +6,20 @@ Ett mattespel för barn (6–13 år) där man räknar så snabbt man kan och tä
 - All text som barnen ser ska vara på svenska. Decimalkomma i tider (34,2).
 - Inga annonser, inget pay-to-win, inga köp. Man tävlar mot sig själv, aldrig mot andra spelare.
 - Ingen Cloudflare och ingen backend. Allt ligger i git.
-- Inget byggsteg. Spelet är en enda självständig `index.html` med CSS och JS inline. Öppna filen i en webbläsare så fungerar den.
-- Inga externa beroenden utöver Google Fonts (Fredoka, Atkinson Hyperlegible), och spelet måste fungera med reservtypsnitten om de inte laddar.
+- Inget byggsteg. Hela spelet är `index.html` med CSS och JS inline. Filerna i roten publiceras exakt som de är, och `index.html` går att öppna direkt i en webbläsare (då utan offlineläge).
+- Inget laddas externt. Typsnitten Fredoka och Atkinson Hyperlegible ligger i `fonts/` (SIL OFL, licenstexten bredvid) och laddas via `@font-face`. Länka inte till Google Fonts, det skickar besökarens IP-adress till Google (GDPR). Spelet ska fungera med reservtypsnitten om typsnitten inte laddar.
+- Spelet ska fungera offline.
 
 ## Filer
 - `index.html` — hela spelet.
+- `sw.js` — service worker som sparar alla filer för offlineläge.
+- `manifest.webmanifest` och `icons/` — gör att spelet kan läggas på hemskärmen.
+- `fonts/` — typsnitten (woff2) med sina OFL-licenser.
+- `CNAME` — egen domän för GitHub Pages.
 - `CLAUDE.md` — den här filen.
+
+## Offlineläge
+`sw.js` sparar filerna i listan `FILES` vid första besöket och svarar sedan från cachen. **Höj `VERSION` i `sw.js` vid varje ändring av en publicerad fil**, annars fortsätter installerade kopior att visa den gamla versionen. Lägg till nya filer i `FILES`.
 
 ## Spelregler
 - Ett lopp = 20 rätta svar (`GOAL`).
@@ -51,6 +59,7 @@ Barnens rekord får inte försvinna. Om strukturen ändras: lägg till en migrer
 1. Syntaxkontroll: `python3 -c "import re;s=open('index.html').read();open('/tmp/a.js','w').write(re.search(r'<script>(.*)</script>',s,re.S).group(1))" && node --check /tmp/a.js`
 2. Öppna `index.html` i webbläsaren: skapa en spelare, kör ett lopp, svara fel minst en gång, kontrollera resultatsidan, kör igen så spöket syns.
 3. Kolla smal mobilvy (ca 375 px) och både ljust och mörkt läge.
+4. Offline (via en lokal server, t.ex. `npx serve .`): ladda sidan, slå av nätet i DevTools och ladda om.
 
 ## Publicering
 GitHub Pages publicerar grenen `main` från roten (repo `dlundin-private/raknefart`). En push till `main` är live efter någon minut på https://raknefart.chandler.se (filen `CNAME`, DNS-posten pekar på `dlundin-private.github.io`).

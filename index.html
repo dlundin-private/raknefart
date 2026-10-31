@@ -4,10 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Räknefart</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Fredoka:wght@500;600;700&display=swap" rel="stylesheet">
+<meta name="theme-color" content="#2F5DDB">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <style>
+@font-face{font-family:"Atkinson Hyperlegible";font-style:normal;font-weight:400;font-display:swap;src:url(fonts/atkinson-400.woff2) format('woff2')}
+@font-face{font-family:"Atkinson Hyperlegible";font-style:normal;font-weight:700;font-display:swap;src:url(fonts/atkinson-700.woff2) format('woff2')}
+@font-face{font-family:Fredoka;font-style:normal;font-weight:500 700;font-display:swap;src:url(fonts/fredoka.woff2) format('woff2')}
 :root{
   --bg:#EAF1FF; --surface:#FFFFFF; --ink:#13224D; --muted:#56668F;
   --track:#2F5DDB; --lane:#FFFFFF; --sun:#FFC531; --sun-ink:#3A2A00;
@@ -487,6 +491,9 @@ function flashKey(k){
 
 /* start */
 if (player()) openLevels(); else renderPlayers();
+
+/* offline (not available when the file is opened directly) */
+if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js').catch(() => {});
 })();
 </script>
 </body>
