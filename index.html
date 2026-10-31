@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Räknefart</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Fredoka:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#EAF1FF; --surface:#FFFFFF; --ink:#13224D; --muted:#56668F;
+  --track:#2F5DDB; --lane:#FFFFFF; --sun:#FFC531; --sun-ink:#3A2A00;
+  --good:#14A866; --bad:#E23A60; --key:#DCE6FF; --key-press:#C3D3FF;
+  --line:#C9D6F5;
+  color-scheme:light;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0D1630; --surface:#17244A; --ink:#EEF3FF; --muted:#9AA9D4;
+    --track:#3A66E6; --lane:#E8EEFF; --sun:#FFCD45; --sun-ink:#2B1F00;
+    --good:#2FD487; --bad:#FF6385; --key:#22325F; --key-press:#2E4280;
+    --line:#2A3B6B;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0D1630; --surface:#17244A; --ink:#EEF3FF; --muted:#9AA9D4;
+  --track:#3A66E6; --lane:#E8EEFF; --sun:#FFCD45; --sun-ink:#2B1F00;
+  --good:#2FD487; --bad:#FF6385; --key:#22325F; --key-press:#2E4280;
+  --line:#2A3B6B;
+  color-scheme:dark;
+}
+*,*::before,*::after{box-sizing:inherit}
+html{height:100%;scroll-padding-top:env(safe-area-inset-top,0px)}
+body{height:100%;margin:0;background:var(--bg);color:var(--ink);
+  font:400 17px/1.45 'Atkinson Hyperlegible',system-ui,-apple-system,'Segoe UI',sans-serif;
+  -webkit-tap-highlight-color:transparent}
+button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
+button:focus-visible,input:focus-visible{outline:3px solid var(--sun);outline-offset:2px}
+.num{font-family:'Fredoka','Arial Rounded MT Bold',system-ui,sans-serif}
+
+.app{max-width:520px;height:100%;margin:0 auto;padding:16px 18px;display:flex;flex-direction:column}
+.screen{display:none;flex:1;min-height:0;flex-direction:column}
+.screen.on{display:flex}
+
+/* Logo: the word sits on a running lane */
+.logo{margin:28px 0 6px;font:700 clamp(44px,13vw,64px)/1 'Fredoka',system-ui,sans-serif;letter-spacing:-.01em;position:relative;padding-bottom:16px}
+.logo::after{content:"";position:absolute;left:0;right:0;bottom:0;height:10px;border-radius:5px;
+  background:linear-gradient(90deg,var(--track) 0 calc(100% - 22px),transparent calc(100% - 22px)),
+  repeating-conic-gradient(var(--ink) 0 25%,var(--lane) 0 50%) right/10px 10px;
+  background-repeat:no-repeat,repeat-y}
+.lead{color:var(--muted);margin:14px 0 18px}
+
+.plist{display:flex;flex-direction:column;gap:10px;overflow:auto;padding-bottom:8px}
+.prow{display:flex;align-items:stretch;background:var(--surface);border-radius:18px;border:2px solid var(--line)}
+.prow .pick{flex:1;display:flex;align-items:center;gap:14px;padding:14px 16px;text-align:left;border-radius:16px}
+.token{width:42px;height:42px;border-radius:50%;background:var(--sun);color:var(--sun-ink);display:grid;place-items:center;
+  font:700 20px/1 'Fredoka',system-ui,sans-serif;flex:none}
+.pname{font:600 21px/1.2 'Fredoka',system-ui,sans-serif}
+.pmeta{color:var(--muted);font-size:15px}
+.prow .del{width:52px;color:var(--muted);font-size:22px;border-radius:16px}
+.add{display:flex;gap:10px;margin-top:14px}
+.add input{flex:1;min-width:0;font:inherit;color:var(--ink);background:var(--surface);border:2px solid var(--line);border-radius:14px;padding:12px 14px}
+.btn{background:var(--track);color:#fff;font:600 18px/1 'Fredoka',system-ui,sans-serif;padding:14px 20px;border-radius:14px}
+.btn.alt{background:var(--key);color:var(--ink)}
+.empty{color:var(--muted);padding:6px 2px}
+
+.bar{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:4px 0 14px}
+.who{display:flex;align-items:center;gap:10px;font:600 20px/1.2 'Fredoka',system-ui,sans-serif}
+.link{color:var(--muted);font-size:15px;padding:8px 4px;text-decoration:underline;text-underline-offset:3px}
+.levels{display:flex;flex-direction:column;gap:8px;overflow:auto;padding-bottom:12px}
+.lvl{display:grid;grid-template-columns:1fr auto;align-items:center;gap:2px 12px;text-align:left;
+  background:var(--surface);border:2px solid var(--line);border-radius:16px;padding:12px 16px}
+.lvl .ln{font:600 18px/1.25 'Fredoka',system-ui,sans-serif}
+.lvl .lh{color:var(--muted);font-size:14px}
+.lvl .ls{grid-row:1 / span 2;grid-column:2;text-align:right}
+.stars{font-size:20px;letter-spacing:2px;color:var(--sun)}
+.stars .off{color:var(--line)}
+.best{display:block;color:var(--muted);font-size:13px}
+
+/* Race */
+.rtop{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.rtitle{font:600 16px/1.2 'Fredoka',system-ui,sans-serif;color:var(--muted);text-align:center;flex:1;padding:0 8px}
+.clock{font:600 22px/1 'Fredoka',system-ui,sans-serif;min-width:72px;text-align:right;font-variant-numeric:tabular-nums}
+.track{position:relative;height:64px;background:var(--track);border-radius:16px;overflow:hidden;flex:none}
+.track::before{content:"";position:absolute;left:0;right:0;top:50%;border-top:2px dashed rgba(255,255,255,.55)}
+.track::after{content:"";position:absolute;top:0;bottom:0;right:10px;width:12px;
+  background:repeating-conic-gradient(#fff 0 25%,#13224D 0 50%) 0 0/12px 12px}
+.runner{position:absolute;width:26px;height:26px;border-radius:50%;display:grid;place-items:center;
+  font:700 13px/1 'Fredoka',system-ui,sans-serif;transition:left .25s ease-out}
+.runner.me{top:34px;background:var(--sun);color:var(--sun-ink);box-shadow:0 0 0 3px rgba(0,0,0,.12)}
+.runner.ghost{top:4px;border:2.5px dashed #fff;color:#fff;background:rgba(255,255,255,.15);transition:none}
+.rnote{color:var(--muted);font-size:14px;margin:8px 2px 0;min-height:20px;display:flex;justify-content:space-between}
+
+.stage{flex:1;min-height:150px;display:grid;place-items:center;position:relative}
+.problem{font:600 clamp(44px,14vw,80px)/1.1 'Fredoka',system-ui,sans-serif;white-space:nowrap;font-variant-numeric:tabular-nums}
+.slot{display:inline-block;min-width:1.4em;padding:0 .12em;text-align:center;border-bottom:6px solid var(--line);border-radius:4px;color:var(--ink)}
+.slot.wait{color:var(--line)}
+.slot.good{border-color:var(--good);color:var(--good)}
+.slot.bad{border-color:var(--bad);color:var(--bad)}
+.count{position:absolute;inset:0;display:grid;place-items:center;font:700 clamp(80px,30vw,140px)/1 'Fredoka',system-ui,sans-serif;color:var(--track)}
+.count.go{font-size:clamp(56px,18vw,96px)}
+.count[hidden]{display:none}
+@keyframes shake{20%{transform:translateX(-8px)}40%{transform:translateX(7px)}60%{transform:translateX(-5px)}80%{transform:translateX(3px)}}
+.shake{animation:shake .35s}
+@keyframes pop{from{transform:scale(.6);opacity:0}to{transform:none;opacity:1}}
+.pop{animation:pop .3s ease-out}
+@media (prefers-reduced-motion: reduce){.shake,.pop{animation:none}.runner{transition:none}}
+
+.pad{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;flex:none}
+.key{background:var(--key);border-radius:16px;height:clamp(52px,8.5vh,68px);font:600 28px/1 'Fredoka',system-ui,sans-serif;touch-action:manipulation;user-select:none}
+.key:active,.key.down{background:var(--key-press)}
+.key.zero{grid-column:span 2}
+.key.back{font-size:24px}
+
+/* Result */
+.res{flex:1;display:flex;flex-direction:column;overflow:auto}
+.rhead{font:700 clamp(36px,11vw,52px)/1.05 'Fredoka',system-ui,sans-serif;margin:28px 0 8px}
+.bigstars{font-size:52px;letter-spacing:6px;color:var(--sun);margin:4px 0 18px}
+.bigstars .off{color:var(--line)}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:18px}
+.stat{background:var(--surface);border:2px solid var(--line);border-radius:16px;padding:12px}
+.stat b{display:block;font:600 26px/1.1 'Fredoka',system-ui,sans-serif;font-variant-numeric:tabular-nums}
+.stat span{color:var(--muted);font-size:14px}
+.next{color:var(--muted);margin:0 0 16px}
+.missed h2{font:600 19px/1.2 'Fredoka',system-ui,sans-serif;margin:0 0 8px}
+.missed ul{list-style:none;margin:0 0 18px;padding:0;display:flex;flex-wrap:wrap;gap:8px}
+.missed li{background:var(--surface);border:2px solid var(--line);border-radius:12px;padding:6px 12px;font:500 19px/1.2 'Fredoka',system-ui,sans-serif}
+.actions{display:flex;gap:10px;margin-top:auto;padding-top:8px}
+.actions .btn{flex:1}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <section id="players" class="screen">
+    <h1 class="logo">Räknefart</h1>
+    <p class="lead">Räkna så snabbt du kan och slå ditt eget rekord. Vem spelar?</p>
+    <div id="plist" class="plist"></div>
+    <form id="addForm" class="add" autocomplete="off">
+      <input id="newName" maxlength="16" placeholder="Skriv ditt namn" aria-label="Namn på ny spelare">
+      <button class="btn" type="submit">Lägg till</button>
+    </form>
+  </section>
+
+  <section id="levels" class="screen">
+    <div class="bar">
+      <div class="who"><span id="whoToken" class="token"></span><span id="whoName"></span></div>
+      <button id="switchBtn" class="link">Byt spelare</button>
+    </div>
+    <p class="lead" style="margin-top:0">Välj en bana. 20 rätta svar tar dig i mål.</p>
+    <div id="lvlList" class="levels"></div>
+  </section>
+
+  <section id="race" class="screen">
+    <div class="rtop">
+      <button id="quitBtn" class="link">Avbryt</button>
+      <div id="raceTitle" class="rtitle"></div>
+      <div id="clock" class="clock">0,0</div>
+    </div>
+    <div class="track" aria-hidden="true">
+      <div id="ghost" class="runner ghost">R</div>
+      <div id="me" class="runner me"></div>
+    </div>
+    <div class="rnote"><span id="ghostNote"></span><span id="progress"></span></div>
+    <div class="stage">
+      <div id="problem" class="problem" aria-live="polite"></div>
+      <div id="count" class="count" hidden></div>
+    </div>
+    <div class="pad" id="pad">
+      <button class="key" data-k="1">1</button><button class="key" data-k="2">2</button><button class="key" data-k="3">3</button>
+      <button class="key" data-k="4">4</button><button class="key" data-k="5">5</button><button class="key" data-k="6">6</button>
+      <button class="key" data-k="7">7</button><button class="key" data-k="8">8</button><button class="key" data-k="9">9</button>
+      <button class="key zero" data-k="0">0</button><button class="key back" data-k="del" aria-label="Sudda">⌫</button>
+    </div>
+  </section>
+
+  <section id="result" class="screen">
+    <div class="res">
+      <div id="resHead" class="rhead"></div>
+      <div id="resStars" class="bigstars"></div>
+      <div class="stats">
+        <div class="stat"><b id="sTime"></b><span>sekunder</span></div>
+        <div class="stat"><b id="sAvg"></b><span>sek per tal</span></div>
+        <div class="stat"><b id="sWrong"></b><span>fel</span></div>
+      </div>
+      <p id="resNext" class="next"></p>
+      <div id="missed" class="missed"></div>
+      <div class="actions">
+        <button id="againBtn" class="btn">Kör igen</button>
+        <button id="menuBtn" class="btn alt">Välj bana</button>
+      </div>
+    </div>
+  </section>
+
+</div>
+<script>
+(function(){
+'use strict';
+const GOAL = 20, PENALTY = 3000, STORE = 'raknefart-v1';
+
+/* ---------- helpers ---------- */
+const $ = id => document.getElementById(id);
+const r = (a,b) => a + Math.floor(Math.random()*(b-a+1));
+const pick = arr => arr[Math.floor(Math.random()*arr.length)];
+const P = (q,a,blank) => ({q, a, blank:!!blank});
+const full = p => p.blank ? p.q.replace('?', p.a) : p.q + ' = ' + p.a;
+const sec = ms => (ms/1000).toLocaleString('sv-SE',{minimumFractionDigits:1,maximumFractionDigits:1});
+const starHTML = n => '★'.repeat(n) + '<span class="off">' + '★'.repeat(3-n) + '</span>';
+
+const table = ts => () => { const t = pick(ts), b = r(1,10);
+  return Math.random() < .5 ? P(t+' × '+b, t*b) : P(b+' × '+t, t*b); };
+
+/* t = [seconds per answer for 2 stars, for 3 stars] */
+const LEVELS = [
+  {id:'plus10', name:'Plus upp till 10', hint:'Från 6 år', t:[3.5,2],
+    gen(){ const a=r(0,10), b=r(0,10-a); return P(a+' + '+b, a+b); }},
+  {id:'minus10', name:'Minus upp till 10', hint:'Från 6 år', t:[3.5,2],
+    gen(){ const a=r(1,10), b=r(0,a); return P(a+' − '+b, a-b); }},
+  {id:'tio', name:'Tiokamrater', hint:'Från 6 år', t:[3.5,2],
+    gen(){ const a=r(0,10); return P(a+' + ? = 10', 10-a, true); }},
+  {id:'pm20', name:'Plus och minus upp till 20', hint:'Från 7 år', t:[4,2.5],
+    gen(){ if(Math.random()<.5){ const a=r(2,18), b=r(1,20-a); return P(a+' + '+b, a+b); }
+           const a=r(5,20), b=r(1,a); return P(a+' − '+b, a-b); }},
+  {id:'pm100', name:'Ental upp till 100', hint:'Från 8 år', t:[5,3],
+    gen(){ const a=r(11,95), b=r(2,9);
+           return (Math.random()<.5 && a+b<=100) ? P(a+' + '+b, a+b) : P(a+' − '+b, a-b); }},
+  {id:'gg1', name:'Gånger 2, 5 och 10', hint:'Från 8 år', t:[4,2.5], gen:table([2,5,10])},
+  {id:'two', name:'Tvåsiffriga tal', hint:'Från 9 år', t:[8,5],
+    gen(){ if(Math.random()<.5){ const a=r(11,79), b=r(11,99-a); return P(a+' + '+b, a+b); }
+           const a=r(30,99), b=r(11,a-1); return P(a+' − '+b, a-b); }},
+  {id:'gg2', name:'Gånger 3, 4 och 6', hint:'Från 9 år', t:[4,2.5], gen:table([3,4,6])},
+  {id:'gg3', name:'Gånger 7, 8 och 9', hint:'Från 9 år', t:[4.5,2.8], gen:table([7,8,9])},
+  {id:'div', name:'Division', hint:'Från 10 år', t:[5,3],
+    gen(){ const t=r(2,10), b=r(1,10); return P((t*b)+' ÷ '+t, b); }},
+  {id:'mix', name:'Blandat', hint:'Från 10 år', t:[6,3.5],
+    gen(){ return pick(LEVELS.filter(l => !['plus10','minus10','tio','mix'].includes(l.id))).gen(); }},
+];
+
+/* ---------- storage ---------- */
+let state = {players:[], current:null};
+try { const s = localStorage.getItem(STORE); if (s) state = Object.assign(state, JSON.parse(s)); } catch(e) {}
+const save = () => { try { localStorage.setItem(STORE, JSON.stringify(state)); } catch(e) {} };
+const player = () => state.players.find(p => p.id === state.current);
+const rec = (p, lid) => (p.levels[lid] = p.levels[lid] || {best:null, stars:0, missed:[]});
+const totalStars = p => Object.values(p.levels).reduce((s,l) => s + (l.stars||0), 0);
+
+/* ---------- screens ---------- */
+function show(id){
+  document.querySelectorAll('.screen').forEach(s => s.classList.toggle('on', s.id === id));
+}
+
+function renderPlayers(){
+  const list = $('plist'); list.innerHTML = '';
+  if (!state.players.length){
+    const e = document.createElement('p'); e.className = 'empty';
+    e.textContent = 'Inga spelare än. Skriv ditt namn nedanför för att börja.';
+    list.appendChild(e);
+  }
+  state.players.forEach(p => {
+    const row = document.createElement('div'); row.className = 'prow';
+    const b = document.createElement('button'); b.className = 'pick';
+    b.innerHTML = '<span class="token"></span><span><span class="pname"></span><br><span class="pmeta"></span></span>';
+    b.querySelector('.token').textContent = p.name.charAt(0).toUpperCase();
+    b.querySelector('.pname').textContent = p.name;
+    b.querySelector('.pmeta').textContent = totalStars(p) + ' av ' + LEVELS.length*3 + ' stjärnor';
+    b.onclick = () => { state.current = p.id; save(); openLevels(); };
+    const d = document.createElement('button'); d.className = 'del'; d.textContent = '×';
+    d.setAttribute('aria-label', 'Ta bort ' + p.name);
+    d.onclick = () => {
+      if (confirm('Ta bort ' + p.name + ' och alla rekord?')){
+        state.players = state.players.filter(x => x.id !== p.id);
+        if (state.current === p.id) state.current = null;
+        save(); renderPlayers();
+      }
+    };
+    row.append(b, d); list.appendChild(row);
+  });
+  show('players');
+}
+
+$('addForm').addEventListener('submit', e => {
+  e.preventDefault();
+  const name = $('newName').value.trim();
+  if (!name) { $('newName').focus(); return; }
+  const p = {id: Date.now().toString(36) + r(100,999), name, levels:{}};
+  state.players.push(p); state.current = p.id; $('newName').value = '';
+  save(); openLevels();
+});
+
+function openLevels(){
+  const p = player(); if (!p) return renderPlayers();
+  $('whoToken').textContent = p.name.charAt(0).toUpperCase();
+  $('whoName').textContent = p.name;
+  const list = $('lvlList'); list.innerHTML = '';
+  LEVELS.forEach(l => {
+    const lr = p.levels[l.id];
+    const b = document.createElement('button'); b.className = 'lvl';
+    b.innerHTML = '<span class="ln"></span><span class="ls"><span class="stars">' + starHTML(lr ? lr.stars : 0) +
+      '</span><span class="best"></span></span><span class="lh"></span>';
+    b.querySelector('.ln').textContent = l.name;
+    b.querySelector('.lh').textContent = l.hint;
+    b.querySelector('.best').textContent = lr && lr.best ? 'Rekord ' + sec(lr.best) + ' s' : 'Inget rekord än';
+    b.onclick = () => startRace(l);
+    list.appendChild(b);
+  });
+  show('levels');
+}
+$('switchBtn').onclick = renderPlayers;
+
+/* ---------- race ---------- */
+let race = null;
+
+function place(el, frac){
+  el.style.left = 'calc(' + Math.min(1, frac).toFixed(4) + ' * (100% - 58px) + 8px)';
+}
+
+function startRace(level){
+  const p = player(), lr = rec(p, level.id);
+  race = {level, lr, done:0, wrong:0, step:0, penalty:0, start:0, typed:'', cur:null,
+          locked:true, missed:[], pending:[], last:'', finished:false, timers:[]};
+  $('raceTitle').textContent = level.name;
+  $('me').textContent = p.name.charAt(0).toUpperCase();
+  place($('me'), 0); place($('ghost'), 0);
+  $('ghost').hidden = !lr.best;
+  $('ghostNote').textContent = lr.best ? 'R = ditt rekord, ' + sec(lr.best) + ' s' : 'Första loppet sätter ditt rekord';
+  $('progress').textContent = '0 / ' + GOAL;
+  $('clock').textContent = '0,0';
+  $('problem').innerHTML = '';
+  show('race');
+  countdown(['3','2','1','Kör!'], () => {
+    race.start = performance.now(); race.locked = false; next(); requestAnimationFrame(tick);
+  });
+}
+
+function later(fn, ms){ const t = setTimeout(fn, ms); race.timers.push(t); }
+
+function countdown(steps, done){
+  const c = $('count'); c.hidden = false;
+  steps.forEach((s, i) => later(() => {
+    c.textContent = s; c.className = 'count pop' + (i === steps.length-1 ? ' go' : '');
+    if (i === steps.length-1) later(() => { c.hidden = true; done(); }, 450);
+  }, i*700));
+}
+
+const elapsed = () => performance.now() - race.start + race.penalty;
+
+function tick(){
+  if (!race || race.finished || race.locked === 'quit') return;
+  const ms = elapsed();
+  $('clock').textContent = sec(ms);
+  if (race.lr.best) place($('ghost'), ms / race.lr.best);
+  requestAnimationFrame(tick);
+}
+
+function next(){
+  race.step++; race.typed = '';
+  let p = null;
+  const due = race.pending.findIndex(x => x.due <= race.step);
+  if (due > -1) p = race.pending.splice(due,1)[0].p;
+  else if (race.lr.missed.length && Math.random() < .3){
+    const m = pick(race.lr.missed); if (m.q !== race.last) p = Object.assign({fromMissed:true}, m);
+  }
+  let guard = 0;
+  while (!p || (p.q === race.last && guard++ < 10)) p = race.level.gen();
+  race.cur = p; race.last = p.q; race.firstTry = true;
+  drawProblem('wait');
+  race.locked = false;
+}
+
+function drawProblem(cls, text){
+  const p = race.cur, prob = $('problem');
+  const parts = (p.blank ? p.q : p.q + ' = ?').split('?');
+  prob.textContent = '';
+  prob.append(parts[0]);
+  const s = document.createElement('span');
+  s.className = 'slot ' + (cls || '');
+  s.textContent = text != null ? text : (race.typed || '?');
+  prob.append(s, parts[1] || '');
+  return s;
+}
+
+function press(k){
+  if (!race || race.locked) return;
+  if (k === 'del'){ race.typed = race.typed.slice(0,-1); }
+  else { if (race.typed.length >= 4) return; race.typed += k; }
+  drawProblem(race.typed ? '' : 'wait');
+  check();
+}
+
+function check(){
+  const t = race.typed; if (!t) return;
+  const ans = race.cur.a, len = String(ans).length;
+  if (Number(t) === ans && t.length === len) correct();
+  else if (t.length >= len) wrong();
+}
+
+function correct(){
+  race.locked = true; race.done++;
+  drawProblem('good', race.cur.a);
+  if (race.cur.fromMissed && race.firstTry)
+    race.lr.missed = race.lr.missed.filter(m => m.q !== race.cur.q);
+  place($('me'), race.done / GOAL);
+  $('progress').textContent = race.done + ' / ' + GOAL;
+  if (race.done >= GOAL) return finish();
+  later(next, 170);
+}
+
+function wrong(){
+  race.locked = true; race.wrong++; race.firstTry = false; race.penalty += PENALTY;
+  const p = {q:race.cur.q, a:race.cur.a, blank:race.cur.blank};
+  if (!race.missed.some(m => m.q === p.q)) race.missed.push(p);
+  race.pending.push({p, due: race.step + 3});
+  const s = drawProblem('bad', race.cur.a);
+  $('problem').classList.remove('shake'); void $('problem').offsetWidth; $('problem').classList.add('shake');
+  later(next, 1100);
+}
+
+function finish(){
+  race.finished = true;
+  const time = elapsed(), avg = time / 1000 / GOAL, l = race.level, lr = race.lr;
+  const stars = 1 + (avg <= l.t[0] ? 1 : 0) + (avg <= l.t[1] ? 1 : 0);
+  const prevBest = lr.best;
+  const record = !prevBest || time < prevBest;
+  if (record) lr.best = Math.round(time);
+  lr.stars = Math.max(lr.stars || 0, stars);
+  const merged = race.missed.concat(lr.missed.filter(m => !race.missed.some(x => x.q === m.q)));
+  lr.missed = merged.slice(0, 12);
+  save();
+  $('clock').textContent = sec(time);
+  later(() => showResult(time, avg, stars, record, prevBest), 500);
+}
+
+function showResult(time, avg, stars, record, prevBest){
+  const l = race.level;
+  $('resHead').textContent = !prevBest ? 'I mål! Ditt första rekord.' : record ? 'Nytt rekord!' : 'I mål!';
+  $('resStars').innerHTML = starHTML(stars);
+  $('sTime').textContent = sec(time);
+  $('sAvg').textContent = avg.toLocaleString('sv-SE',{minimumFractionDigits:1,maximumFractionDigits:1});
+  $('sWrong').textContent = race.wrong;
+  let next = '';
+  if (stars < 3){
+    const target = (stars === 1 ? l.t[0] : l.t[1]) * GOAL * 1000;
+    next = 'Klara loppet på ' + sec(target) + ' sekunder för ' + (stars + 1) + ' stjärnor. Varje fel kostar 3 sekunder.';
+  } else if (!record) {
+    next = 'Rekordet är ' + sec(prevBest) + ' sekunder. ' + sec(time - prevBest) + ' sekunder kvar att kapa.';
+  } else next = 'Tre stjärnor. Prova en svårare bana eller slå ditt nya rekord.';
+  $('resNext').textContent = next;
+  const m = $('missed'); m.innerHTML = '';
+  if (race.missed.length){
+    const h = document.createElement('h2'); h.textContent = 'Öva på de här, de kommer tillbaka nästa gång';
+    const ul = document.createElement('ul');
+    race.missed.forEach(p => { const li = document.createElement('li'); li.textContent = full(p); ul.appendChild(li); });
+    m.append(h, ul);
+  }
+  show('result');
+}
+
+function stopRace(){
+  if (!race) return;
+  race.timers.forEach(clearTimeout); race.locked = 'quit'; $('count').hidden = true;
+}
+
+$('quitBtn').onclick = () => { stopRace(); openLevels(); };
+$('againBtn').onclick = () => { const l = race.level; stopRace(); startRace(l); };
+$('menuBtn').onclick = () => { stopRace(); openLevels(); };
+
+/* input: pointerdown for speed on touch screens, keyboard for computers */
+$('pad').addEventListener('pointerdown', e => {
+  const k = e.target.closest('.key'); if (!k) return;
+  e.preventDefault(); press(k.dataset.k);
+});
+document.addEventListener('keydown', e => {
+  if (!$('race').classList.contains('on')) return;
+  if (/^[0-9]$/.test(e.key)) { press(e.key); flashKey(e.key); }
+  else if (e.key === 'Backspace') { press('del'); flashKey('del'); }
+  else if (e.key === 'Escape') { stopRace(); openLevels(); }
+});
+function flashKey(k){
+  const b = document.querySelector('.key[data-k="' + k + '"]'); if (!b) return;
+  b.classList.add('down'); setTimeout(() => b.classList.remove('down'), 90);
+}
+
+/* start */
+if (player()) openLevels(); else renderPlayers();
+})();
+</script>
+</body>
+</html>
