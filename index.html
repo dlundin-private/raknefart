@@ -85,6 +85,10 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--sun);outline-of
 .stars{font-size:20px;letter-spacing:2px;color:var(--sun)}
 .stars .off{color:var(--line)}
 .best{display:block;color:var(--muted);font-size:13px}
+.lvl .rec{display:block;font:600 19px/1.2 'Fredoka',system-ui,sans-serif;font-variant-numeric:tabular-nums}
+.modes{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;background:var(--key);border-radius:14px;padding:4px;margin:0 0 10px;flex:none}
+.mode{padding:10px 4px;border-radius:11px;font:600 16px/1.2 'Fredoka',system-ui,sans-serif;color:var(--muted)}
+.mode[aria-pressed="true"]{background:var(--surface);color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.15)}
 
 /* Race */
 .rtop{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
@@ -98,7 +102,14 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--sun);outline-of
   font:700 13px/1 'Fredoka',system-ui,sans-serif;transition:left .25s ease-out}
 .runner.me{top:34px;background:var(--sun);color:var(--sun-ink);box-shadow:0 0 0 3px rgba(0,0,0,.12)}
 .runner.ghost{top:4px;border:2.5px dashed #fff;color:#fff;background:rgba(255,255,255,.15);transition:none}
+.runner[hidden]{display:none}
 .rnote{color:var(--muted);font-size:14px;margin:8px 2px 0;min-height:20px;display:flex;justify-content:space-between}
+.hearts{color:var(--bad);letter-spacing:2px}
+.hearts .off{color:var(--line)}
+.qbar{height:8px;border-radius:4px;background:var(--key);margin-top:8px;overflow:hidden;flex:none}
+.qbar[hidden]{display:none}
+.qfill{height:100%;width:100%;background:var(--good);border-radius:4px}
+.qfill.low{background:var(--bad)}
 
 .stage{flex:1;min-height:150px;display:grid;place-items:center;position:relative}
 .problem{font:600 clamp(44px,14vw,80px)/1.1 'Fredoka',system-ui,sans-serif;white-space:nowrap;font-variant-numeric:tabular-nums}
@@ -126,6 +137,7 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--sun);outline-of
 .rhead{font:700 clamp(36px,11vw,52px)/1.05 'Fredoka',system-ui,sans-serif;margin:28px 0 8px}
 .bigstars{font-size:52px;letter-spacing:6px;color:var(--sun);margin:4px 0 18px}
 .bigstars .off{color:var(--line)}
+.bigstars[hidden]{display:none}
 .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:18px}
 .stat{background:var(--surface);border:2px solid var(--line);border-radius:16px;padding:12px}
 .stat b{display:block;font:600 26px/1.1 'Fredoka',system-ui,sans-serif;font-variant-numeric:tabular-nums}
@@ -156,7 +168,10 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--sun);outline-of
       <div class="who"><span id="whoToken" class="token"></span><span id="whoName"></span></div>
       <button id="switchBtn" class="link">Byt spelare</button>
     </div>
-    <p class="lead" style="margin-top:0">Välj en bana. 20 rätta svar tar dig i mål.</p>
+    <div class="modes" role="group" aria-label="Spelläge">
+      <button class="mode" data-mode="race">Lopp</button><button class="mode" data-mode="sprint">Minutjakt</button><button class="mode" data-mode="lives">Tre liv</button>
+    </div>
+    <p id="modeLead" class="lead" style="margin-top:0"></p>
     <div id="lvlList" class="levels"></div>
   </section>
 
@@ -171,6 +186,7 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--sun);outline-of
       <div id="me" class="runner me"></div>
     </div>
     <div class="rnote"><span id="ghostNote"></span><span id="progress"></span></div>
+    <div id="qbar" class="qbar" hidden aria-hidden="true"><div id="qfill" class="qfill"></div></div>
     <div class="stage">
       <div id="problem" class="problem" aria-live="polite"></div>
       <div id="count" class="count" hidden></div>
@@ -188,7 +204,7 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--sun);outline-of
       <div id="resHead" class="rhead"></div>
       <div id="resStars" class="bigstars"></div>
       <div class="stats">
-        <div class="stat"><b id="sTime"></b><span>sekunder</span></div>
+        <div class="stat"><b id="sTime"></b><span id="sTimeL">sekunder</span></div>
         <div class="stat"><b id="sAvg"></b><span>sek per tal</span></div>
         <div class="stat"><b id="sWrong"></b><span>fel</span></div>
       </div>
@@ -206,6 +222,14 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--sun);outline-of
 (function(){
 'use strict';
 const GOAL = 20, PENALTY = 3000, STORE = 'raknefart-v1';
+const SPRINT = 60000, LIVES = 3;
+
+/* race: fixed number of answers, best time. sprint and lives: best number of correct answers */
+const MODES = {
+  race:   {lead:'20 rätta svar tar dig i mål. Varje fel kostar 3 sekunder.'},
+  sprint: {lead:'Så många rätt du hinner på en minut. Varje fel kostar 3 sekunder.'},
+  lives:  {lead:'Svara innan tiden tar slut. Den blir kortare för varje rätt svar. Tre fel och det är slut.'},
+};
 
 /* ---------- helpers ---------- */
 const $ = id => document.getElementById(id);
@@ -246,12 +270,14 @@ const LEVELS = [
 ];
 
 /* ---------- storage ---------- */
-let state = {players:[], current:null};
+let state = {players:[], current:null, mode:'race'};
 try { const s = localStorage.getItem(STORE); if (s) state = Object.assign(state, JSON.parse(s)); } catch(e) {}
 const save = () => { try { localStorage.setItem(STORE, JSON.stringify(state)); } catch(e) {} };
 const player = () => state.players.find(p => p.id === state.current);
 const rec = (p, lid) => (p.levels[lid] = p.levels[lid] || {best:null, stars:0, missed:[]});
 const totalStars = p => Object.values(p.levels).reduce((s,l) => s + (l.stars||0), 0);
+const mode = () => MODES[state.mode] ? state.mode : 'race';
+const hearts = n => '♥'.repeat(n) + '<span class="off">' + '♥'.repeat(LIVES-n) + '</span>';
 
 /* ---------- screens ---------- */
 function show(id){
@@ -300,21 +326,32 @@ function openLevels(){
   const p = player(); if (!p) return renderPlayers();
   $('whoToken').textContent = p.name.charAt(0).toUpperCase();
   $('whoName').textContent = p.name;
+  const m = mode();
+  document.querySelectorAll('.mode').forEach(b => b.setAttribute('aria-pressed', b.dataset.mode === m));
+  $('modeLead').textContent = MODES[m].lead;
   const list = $('lvlList'); list.innerHTML = '';
   LEVELS.forEach(l => {
     const lr = p.levels[l.id];
     const b = document.createElement('button'); b.className = 'lvl';
-    b.innerHTML = '<span class="ln"></span><span class="ls"><span class="stars">' + starHTML(lr ? lr.stars : 0) +
-      '</span><span class="best"></span></span><span class="lh"></span>';
+    if (m === 'race'){
+      b.innerHTML = '<span class="ln"></span><span class="ls"><span class="stars">' + starHTML(lr ? lr.stars : 0) +
+        '</span><span class="best"></span></span><span class="lh"></span>';
+      b.querySelector('.best').textContent = lr && lr.best ? 'Rekord ' + sec(lr.best) + ' s' : 'Inget rekord än';
+    } else {
+      b.innerHTML = '<span class="ln"></span><span class="ls"><span class="rec"></span><span class="best"></span></span><span class="lh"></span>';
+      const best = lr && lr[m];
+      b.querySelector('.rec').textContent = best ? best + ' rätt' : '';
+      b.querySelector('.best').textContent = best ? 'rekord' : 'Inget rekord än';
+    }
     b.querySelector('.ln').textContent = l.name;
     b.querySelector('.lh').textContent = l.hint;
-    b.querySelector('.best').textContent = lr && lr.best ? 'Rekord ' + sec(lr.best) + ' s' : 'Inget rekord än';
-    b.onclick = () => startRace(l);
+    b.onclick = () => startRace(l, m);
     list.appendChild(b);
   });
   show('levels');
 }
 $('switchBtn').onclick = renderPlayers;
+document.querySelectorAll('.mode').forEach(b => b.onclick = () => { state.mode = b.dataset.mode; save(); openLevels(); });
 
 /* ---------- race ---------- */
 let race = null;
@@ -323,17 +360,31 @@ function place(el, frac){
   el.style.left = 'calc(' + Math.min(1, frac).toFixed(4) + ' * (100% - 58px) + 8px)';
 }
 
-function startRace(level){
+/* the record to beat: a time in race mode, a number of correct answers otherwise */
+const bestOf = () => race.mode === 'race' ? race.lr.best : race.lr[race.mode] || 0;
+/* how many correct answers reach the finish flag */
+const target = () => race.mode === 'race' ? GOAL : bestOf() || GOAL;
+
+function startRace(level, m){
+  m = m || 'race';
   const p = player(), lr = rec(p, level.id);
-  race = {level, lr, done:0, wrong:0, step:0, penalty:0, start:0, typed:'', cur:null,
-          locked:true, missed:[], pending:[], last:'', finished:false, timers:[]};
+  race = {level, lr, mode:m, done:0, wrong:0, step:0, penalty:0, start:0, typed:'', cur:null,
+          locked:true, missed:[], pending:[], last:'', finished:false, timers:[],
+          lives:LIVES, limit:level.t[0]*2000, qStart:0};
+  const best = bestOf();
   $('raceTitle').textContent = level.name;
   $('me').textContent = p.name.charAt(0).toUpperCase();
   place($('me'), 0); place($('ghost'), 0);
-  $('ghost').hidden = !lr.best;
-  $('ghostNote').textContent = lr.best ? 'R = ditt rekord, ' + sec(lr.best) + ' s' : 'Första loppet sätter ditt rekord';
-  $('progress').textContent = '0 / ' + GOAL;
-  $('clock').textContent = '0,0';
+  $('ghost').hidden = !best || m === 'lives';
+  $('ghostNote').textContent =
+    m === 'race'   ? (best ? 'R = ditt rekord, ' + sec(best) + ' s' : 'Första loppet sätter ditt rekord') :
+    m === 'sprint' ? (best ? 'R = ditt rekord, ' + best + ' rätt' : 'Första minuten sätter ditt rekord') :
+                     (best ? 'Målflaggan = ditt rekord, ' + best + ' rätt' : 'Första försöket sätter ditt rekord');
+  $('progress').textContent = m === 'race' ? '0 / ' + GOAL : '0 rätt';
+  $('clock').className = 'clock' + (m === 'lives' ? ' hearts' : '');
+  if (m === 'lives') $('clock').innerHTML = hearts(LIVES);
+  else $('clock').textContent = m === 'sprint' ? sec(SPRINT) : '0,0';
+  $('qbar').hidden = m !== 'lives';
   $('problem').innerHTML = '';
   show('race');
   countdown(['3','2','1','Kör!'], () => {
@@ -356,8 +407,19 @@ const elapsed = () => performance.now() - race.start + race.penalty;
 function tick(){
   if (!race || race.finished || race.locked === 'quit') return;
   const ms = elapsed();
-  $('clock').textContent = sec(ms);
-  if (race.lr.best) place($('ghost'), ms / race.lr.best);
+  if (race.mode === 'race'){
+    $('clock').textContent = sec(ms);
+    if (race.lr.best) place($('ghost'), ms / race.lr.best);
+  } else if (race.mode === 'sprint'){
+    $('clock').textContent = sec(Math.max(0, SPRINT - ms));
+    place($('ghost'), ms / SPRINT);
+    if (ms >= SPRINT) return finish();
+  } else if (!race.locked){
+    const left = race.limit - (performance.now() - race.qStart), f = Math.max(0, left / race.limit);
+    $('qfill').style.width = (f*100).toFixed(1) + '%';
+    $('qfill').classList.toggle('low', f < .3);
+    if (left <= 0) wrong();
+  }
   requestAnimationFrame(tick);
 }
 
@@ -373,6 +435,8 @@ function next(){
   while (!p || (p.q === race.last && guard++ < 10)) p = race.level.gen();
   race.cur = p; race.last = p.q; race.firstTry = true;
   drawProblem('wait');
+  race.qStart = performance.now();
+  $('qfill').style.width = '100%'; $('qfill').classList.remove('low');
   race.locked = false;
 }
 
@@ -408,44 +472,69 @@ function correct(){
   drawProblem('good', race.cur.a);
   if (race.cur.fromMissed && race.firstTry)
     race.lr.missed = race.lr.missed.filter(m => m.q !== race.cur.q);
-  place($('me'), race.done / GOAL);
-  $('progress').textContent = race.done + ' / ' + GOAL;
-  if (race.done >= GOAL) return finish();
+  place($('me'), race.done / target());
+  if (race.mode === 'race'){
+    $('progress').textContent = race.done + ' / ' + GOAL;
+    if (race.done >= GOAL) return finish();
+  } else {
+    $('progress').textContent = race.done + ' rätt';
+    if (race.mode === 'lives') race.limit = Math.max(race.level.t[1]*700, race.limit*.94);
+  }
   later(next, 170);
 }
 
+/* a wrong answer, or in lives mode also running out of time */
 function wrong(){
-  race.locked = true; race.wrong++; race.firstTry = false; race.penalty += PENALTY;
+  race.locked = true; race.wrong++; race.firstTry = false;
+  if (race.mode !== 'lives') race.penalty += PENALTY;
   const p = {q:race.cur.q, a:race.cur.a, blank:race.cur.blank};
   if (!race.missed.some(m => m.q === p.q)) race.missed.push(p);
   race.pending.push({p, due: race.step + 3});
   const s = drawProblem('bad', race.cur.a);
   $('problem').classList.remove('shake'); void $('problem').offsetWidth; $('problem').classList.add('shake');
+  if (race.mode === 'lives'){
+    race.lives--; $('clock').innerHTML = hearts(race.lives);
+    if (!race.lives) return later(finish, 1100);
+  }
   later(next, 1100);
 }
 
 function finish(){
-  race.finished = true;
-  const time = elapsed(), avg = time / 1000 / GOAL, l = race.level, lr = race.lr;
-  const stars = 1 + (avg <= l.t[0] ? 1 : 0) + (avg <= l.t[1] ? 1 : 0);
-  const prevBest = lr.best;
-  const record = !prevBest || time < prevBest;
-  if (record) lr.best = Math.round(time);
-  lr.stars = Math.max(lr.stars || 0, stars);
+  if (race.finished) return;
+  race.finished = true; race.timers.forEach(clearTimeout); race.timers = [];
+  const m = race.mode, l = race.level, lr = race.lr;
+  const time = m === 'sprint' ? SPRINT : elapsed();
+  const avg = m === 'race' ? time / 1000 / GOAL : race.done ? time / 1000 / race.done : null;
+  let stars = 0, record, prevBest;
+  if (m === 'race'){
+    stars = 1 + (avg <= l.t[0] ? 1 : 0) + (avg <= l.t[1] ? 1 : 0);
+    prevBest = lr.best;
+    record = !prevBest || time < prevBest;
+    if (record) lr.best = Math.round(time);
+    lr.stars = Math.max(lr.stars || 0, stars);
+  } else {
+    prevBest = lr[m] || 0;
+    record = race.done > prevBest;
+    if (record) lr[m] = race.done;
+  }
   const merged = race.missed.concat(lr.missed.filter(m => !race.missed.some(x => x.q === m.q)));
   lr.missed = merged.slice(0, 12);
   save();
-  $('clock').textContent = sec(time);
+  if (m === 'race') $('clock').textContent = sec(time);
+  if (m === 'sprint') $('clock').textContent = sec(0);
   later(() => showResult(time, avg, stars, record, prevBest), 500);
 }
 
 function showResult(time, avg, stars, record, prevBest){
-  const l = race.level;
+  const l = race.level, m = race.mode;
+  $('resStars').hidden = m !== 'race';
+  $('sAvg').textContent = avg == null ? '–' : avg.toLocaleString('sv-SE',{minimumFractionDigits:1,maximumFractionDigits:1});
+  $('sWrong').textContent = race.wrong;
+  if (m !== 'race') return showCountResult(record, prevBest);
   $('resHead').textContent = !prevBest ? 'I mål! Ditt första rekord.' : record ? 'Nytt rekord!' : 'I mål!';
   $('resStars').innerHTML = starHTML(stars);
   $('sTime').textContent = sec(time);
-  $('sAvg').textContent = avg.toLocaleString('sv-SE',{minimumFractionDigits:1,maximumFractionDigits:1});
-  $('sWrong').textContent = race.wrong;
+  $('sTimeL').textContent = 'sekunder';
   let next = '';
   if (stars < 3){
     const target = (stars === 1 ? l.t[0] : l.t[1]) * GOAL * 1000;
@@ -454,6 +543,25 @@ function showResult(time, avg, stars, record, prevBest){
     next = 'Rekordet är ' + sec(prevBest) + ' sekunder. ' + sec(time - prevBest) + ' sekunder kvar att kapa.';
   } else next = 'Tre stjärnor. Prova en svårare bana eller slå ditt nya rekord.';
   $('resNext').textContent = next;
+  showMissed();
+}
+
+/* result for sprint and lives, where the score is the number of correct answers */
+function showCountResult(record, prevBest){
+  const done = race.done, over = race.mode === 'sprint' ? 'Tiden är ute!' : 'Slut på liv!';
+  $('resHead').textContent = record && !prevBest ? over + ' Ditt första rekord.' : record ? 'Nytt rekord!' : over;
+  $('sTime').textContent = done;
+  $('sTimeL').textContent = 'rätt';
+  $('resNext').textContent =
+    record && !prevBest ? 'Nu har du ett rekord att slå: ' + done + ' rätt.' :
+    record ? 'Förra rekordet var ' + prevBest + ' rätt. Kan du slå ' + done + ' nästa gång?' :
+    !prevBest ? 'Inget rätt den här gången. Prova igen eller välj en lättare bana.' :
+    done === prevBest ? 'Lika med rekordet! Ett rätt till så slår du det.' :
+    'Rekordet är ' + prevBest + ' rätt. ' + (prevBest - done + 1) + ' rätt till så slår du det.';
+  showMissed();
+}
+
+function showMissed(){
   const m = $('missed'); m.innerHTML = '';
   if (race.missed.length){
     const h = document.createElement('h2'); h.textContent = 'Öva på de här, de kommer tillbaka nästa gång';
@@ -470,7 +578,7 @@ function stopRace(){
 }
 
 $('quitBtn').onclick = () => { stopRace(); openLevels(); };
-$('againBtn').onclick = () => { const l = race.level; stopRace(); startRace(l); };
+$('againBtn').onclick = () => { const l = race.level, m = race.mode; stopRace(); startRace(l, m); };
 $('menuBtn').onclick = () => { stopRace(); openLevels(); };
 
 /* input: pointerdown for speed on touch screens, keyboard for computers */

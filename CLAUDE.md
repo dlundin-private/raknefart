@@ -21,6 +21,14 @@ Ett mattespel för barn (6–13 år) där man räknar så snabbt man kan och tä
 ## Offlineläge
 `sw.js` sparar filerna i listan `FILES` vid första besöket och svarar sedan från cachen. **Höj `VERSION` i `sw.js` vid varje ändring av en publicerad fil**, annars fortsätter installerade kopior att visa den gamla versionen. Lägg till nya filer i `FILES`.
 
+## Spellägen
+Läget väljs med flikarna ovanför banlistan och gäller alla banor (`MODES`, valt läge sparas i `state.mode`).
+- **Lopp** (`race`): 20 rätta svar, så snabbt som möjligt. Rekord = bästa tid, ger stjärnor.
+- **Minutjakt** (`sprint`): så många rätt som möjligt på 60 sekunder (`SPRINT`). Fel kostar 3 sekunder av tiden. Spöket springer i rekordtempo.
+- **Tre liv** (`lives`): varje tal har en egen tidsgräns som börjar på `t[0] × 2` sekunder och blir 6 % kortare för varje rätt svar, men aldrig under `t[1] × 0,7`. Fel svar eller för sent svar kostar ett liv. Tre liv (`LIVES`). Målflaggan är rekordet.
+
+I Minutjakt och Tre liv är rekordet antal rätt, och de ger inga stjärnor. Missade uppgifter samlas och återkommer i alla lägen.
+
 ## Spelregler
 - Ett lopp = 20 rätta svar (`GOAL`).
 - Svaret rättas automatiskt när rätt antal siffror är inskrivet. Ingen enter-knapp.
@@ -44,7 +52,8 @@ Banorna ligger i arrayen `LEVELS`. Varje bana:
 ## Sparad data
 `localStorage`, nyckel `raknefart-v1`, alltid inom try/catch:
 ```js
-{ players:[{ id, name, levels:{ [levelId]: { best: ms|null, stars: 0-3, missed: [{q,a,blank}] } } }], current: playerId }
+{ players:[{ id, name, levels:{ [levelId]: { best: ms|null, stars: 0-3, sprint?: antal, lives?: antal, missed: [{q,a,blank}] } } }],
+  current: playerId, mode: 'race'|'sprint'|'lives' }
 ```
 Barnens rekord får inte försvinna. Om strukturen ändras: lägg till en migrering som läser gammal data, och byt bara nyckel om det är nödvändigt.
 
@@ -57,7 +66,7 @@ Barnens rekord får inte försvinna. Om strukturen ändras: lägg till en migrer
 
 ## Testa efter ändringar
 1. Syntaxkontroll: `python3 -c "import re;s=open('index.html').read();open('/tmp/a.js','w').write(re.search(r'<script>(.*)</script>',s,re.S).group(1))" && node --check /tmp/a.js`
-2. Öppna `index.html` i webbläsaren: skapa en spelare, kör ett lopp, svara fel minst en gång, kontrollera resultatsidan, kör igen så spöket syns.
+2. Öppna `index.html` i webbläsaren: skapa en spelare, kör ett lopp, svara fel minst en gång, kontrollera resultatsidan, kör igen så spöket syns. Prova även Minutjakt och Tre liv (låt tiden gå ut).
 3. Kolla smal mobilvy (ca 375 px) och både ljust och mörkt läge.
 4. Offline (via en lokal server, t.ex. `npx serve .`): ladda sidan, slå av nätet i DevTools och ladda om.
 

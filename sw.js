@@ -1,6 +1,6 @@
 // Offline cache for Räknefart. Bump VERSION whenever a site file changes,
 // otherwise installed copies keep serving the old files.
-const VERSION = 'raknefart-v1';
+const VERSION = 'raknefart-v2';
 const FILES = [
   './', './index.html', './manifest.webmanifest',
   './fonts/atkinson-400.woff2', './fonts/atkinson-700.woff2', './fonts/fredoka.woff2',
